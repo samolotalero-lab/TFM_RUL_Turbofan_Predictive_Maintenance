@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+.env/
+
+# VS Code
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Results
+results/
+
+# Models
+*.pkl
+*.keras
+
+# Excel
+~$*.xlsx
+
+# Logs
+*.log
