@@ -24,7 +24,10 @@ from src.config import (
     XGB_COLSAMPLE,
 )
 
-from src.evaluation.metrics import evaluate_model
+from src.evaluation.metrics import (
+    evaluate_model,
+)
+
 from src.evaluation.plots import (
     plot_predictions,
     plot_feature_importance,
@@ -36,20 +39,25 @@ def train_xgboost(
     X_test,
     y_train,
     y_test,
+    test_info,
 ):
     """
-    Entrena un modelo XGBoost utilizando el
-    protocolo oficial de evaluación NASA C-MAPSS.
+    Entrena un modelo XGBoost utilizando
+    el protocolo oficial NASA C-MAPSS.
+
+    La evaluación se realiza únicamente
+    sobre la última observación de cada motor.
     """
 
     output_path = Path("results/xgboost")
+
     output_path.mkdir(
         parents=True,
         exist_ok=True,
     )
 
     # ==================================================
-    # Configuración del modelo
+    # Modelo
     # ==================================================
 
     model = XGBRegressor(
@@ -91,7 +99,7 @@ def train_xgboost(
 
     train_time = time.perf_counter() - start
 
-    print(f"Tiempo entrenamiento : {train_time:.3f} segundos")
+    print(f"Tiempo entrenamiento : {train_time:.2f} segundos")
 
     # ==================================================
     # Predicción
@@ -119,51 +127,93 @@ def train_xgboost(
     )
 
     # ==================================================
-    # Guardar predicciones
+    # Construcción del DataFrame de predicciones
     # ==================================================
 
-    prediction_df = pd.DataFrame(
-        {
-            "Real_RUL": y_test.values,
-            "Predicted_RUL": predictions,
-        }
+    prediction_df = test_info.copy()
+
+    prediction_df["Real_RUL"] = y_test.values
+
+    prediction_df["Predicted_RUL"] = predictions
+
+    # ==================================================
+    # Protocolo oficial NASA
+    # Mantener únicamente la última observación
+    # de cada motor
+    # ==================================================
+
+    prediction_df = (
+
+        prediction_df
+
+        .sort_values(
+            ["engine_id", "cycle"]
+        )
+
+        .groupby("engine_id")
+
+        .tail(1)
+
+        .reset_index(drop=True)
+
+    )
+
+    # ==================================================
+    # Errores
+    # ==================================================
+
+    prediction_df["Signed_Error"] = (
+
+        prediction_df["Predicted_RUL"]
+
+        - prediction_df["Real_RUL"]
+
+    )
+
+    prediction_df["Absolute_Error"] = (
+
+        prediction_df["Signed_Error"].abs()
+
+    )
+
+    # ==================================================
+    # Guardar resultados
+    # ==================================================
+
+    prediction_df.to_csv(
+
+        output_path / "predictions.csv",
+
+        index=False,
+
     )
 
     prediction_df.to_csv(
-        output_path / "predictions.csv",
-        index=False,
-    )
 
-    # ==================================================
-    # Guardar errores
-    # ==================================================
-
-    errors = prediction_df.copy()
-
-    errors["Error"] = (
-        errors["Predicted_RUL"]
-        - errors["Real_RUL"]
-    )
-
-    errors["Absolute_Error"] = (
-        errors["Error"].abs()
-    )
-
-    errors.to_csv(
         output_path / "prediction_errors.csv",
+
         index=False,
+
     )
 
     # ==================================================
-    # Evaluación
+    # Evaluación oficial NASA
     # ==================================================
 
     evaluate_model(
+
         model_name="xgboost",
-        y_true=y_test,
-        y_pred=predictions,
+
+        y_true=prediction_df["Real_RUL"],
+
+        y_pred=prediction_df["Predicted_RUL"],
+
         train_time=train_time,
+
         prediction_time=prediction_time,
+
+        test_info=None,
+
     )
 
     # ==================================================
@@ -171,54 +221,122 @@ def train_xgboost(
     # ==================================================
 
     plot_predictions(
-        y_test,
-        predictions,
-        "xgboost",
-    )
 
-    # ==================================================
+        prediction_df["Real_RUL"],
+
+        prediction_df["Predicted_RUL"],
+
+        "xgboost",
+
+    )
+        # ==================================================
     # Importancia de variables
     # ==================================================
 
     plot_feature_importance(
+
         X_train.columns,
+
         model.feature_importances_,
+
         "xgboost",
+
     )
 
     importance = pd.DataFrame(
+
         {
+
             "Feature": X_train.columns,
+
             "Importance": model.feature_importances_,
+
         }
+
     )
 
     importance = importance.sort_values(
+
         by="Importance",
+
         ascending=False,
+
     )
 
     importance.to_excel(
+
         output_path / "feature_importance.xlsx",
+
         index=False,
+
     )
 
     importance.head(10).to_excel(
+
         output_path / "feature_importance_top10.xlsx",
+
         index=False,
+
     )
 
     # ==================================================
-    # Consola
+    # Información protocolo NASA
+    # ==================================================
+
+    print("\n" + "=" * 60)
+    print("PROTOCOLO OFICIAL NASA")
+    print("=" * 60)
+
+    print(
+        f"Motores evaluados : {len(prediction_df)}"
+    )
+
+    print(
+        f"Predicciones usadas para NASA Score : {len(prediction_df)}"
+    )
+
+    print(
+        "\n(Se utiliza únicamente la última predicción de cada motor)"
+    )
+
+    # ==================================================
+    # Top variables
     # ==================================================
 
     print("\nTop 10 variables más importantes:\n")
 
-    print(importance.head(10))
+    print(
+        importance.head(10)
+    )
+
+    # ==================================================
+    # Resumen
+    # ==================================================
+
+    print("\n" + "=" * 60)
+    print("XGBOOST FINALIZADO")
+    print("=" * 60)
+
+    print("\nModelo guardado en:")
+    print(output_path / "xgboost.pkl")
+
+    print("\nPredicciones guardadas en:")
+    print(output_path / "predictions.csv")
+
+    print("\nErrores guardados en:")
+    print(output_path / "prediction_errors.csv")
+
+    print("\nImportancia de variables:")
+    print(output_path / "feature_importance.xlsx")
+
+    print(output_path / "feature_importance_top10.xlsx")
+
+    print(f"\nTiempo entrenamiento : {train_time:.2f} segundos")
+
+    print(f"Tiempo inferencia    : {prediction_time:.4f} segundos")
 
     print("\nModelo XGBoost entrenado correctamente.")
 
     print(f"\nResultados guardados en:\n{output_path}")
 
     return model
-

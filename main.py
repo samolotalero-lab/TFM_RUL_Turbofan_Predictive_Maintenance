@@ -164,6 +164,8 @@ def main():
         y_test,
         X_train_scaled,
         X_test_scaled,
+        train_info,
+        test_info,
     ) = preprocess_data(
         train,
         test,
@@ -181,6 +183,9 @@ def main():
     print(f"\nX_train_scaled  : {X_train_scaled.shape}")
     print(f"X_test_scaled   : {X_test_scaled.shape}")
 
+    print(f"\ntrain_info      : {train_info.shape}")
+    print(f"test_info       : {test_info.shape}")
+
     # ==========================================================
     # MODELO 1 - RANDOM FOREST
     # ==========================================================
@@ -194,6 +199,27 @@ def main():
         X_test,
         y_train,
         y_test,
+        test_info,
+    )
+
+    print("\nRandom Forest finalizado correctamente.")
+
+    print("\nModelo almacenado en:")
+    print("results/random_forest/")
+        # ==========================================================
+    # MODELO 1 - RANDOM FOREST
+    # ==========================================================
+
+    print("\n" + "=" * 60)
+    print("MODELO 1 - RANDOM FOREST")
+    print("=" * 60)
+
+    rf_model = train_random_forest(
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+        test_info,
     )
 
     print("\nRandom Forest finalizado correctamente.")
@@ -214,6 +240,7 @@ def main():
         X_test,
         y_train,
         y_test,
+        test_info,
     )
 
     print("\nXGBoost finalizado correctamente.")
@@ -234,6 +261,8 @@ def main():
         X_test_scaled,
         y_train,
         y_test,
+        train_info,
+        test_info,
     )
 
     print("\nLSTM finalizado correctamente.")

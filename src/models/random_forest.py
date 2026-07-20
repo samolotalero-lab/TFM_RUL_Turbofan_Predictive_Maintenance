@@ -22,7 +22,10 @@ from src.config import (
     RF_N_JOBS,
 )
 
-from src.evaluation.metrics import evaluate_model
+from src.evaluation.metrics import (
+    evaluate_model,
+)
+
 from src.evaluation.plots import (
     plot_predictions,
     plot_feature_importance,
@@ -34,13 +37,15 @@ def train_random_forest(
     X_test,
     y_train,
     y_test,
+    test_info,
 ):
     """
-    Entrena un modelo Random Forest utilizando el
-    protocolo oficial de evaluación NASA C-MAPSS.
+    Entrena un modelo Random Forest utilizando
+    el protocolo oficial NASA C-MAPSS.
     """
 
     output_path = Path("results/random_forest")
+
     output_path.mkdir(
         parents=True,
         exist_ok=True,
@@ -85,7 +90,9 @@ def train_random_forest(
 
     train_time = time.perf_counter() - start
 
-    print(f"Tiempo entrenamiento : {train_time:.3f} segundos")
+    print(
+        f"Tiempo entrenamiento : {train_time:.2f} segundos"
+    )
 
     # ==================================================
     # Predicción
@@ -99,9 +106,13 @@ def train_random_forest(
         X_test
     )
 
-    prediction_time = time.perf_counter() - start
+    prediction_time = (
+        time.perf_counter() - start
+    )
 
-    print(f"Tiempo inferencia : {prediction_time:.4f} segundos")
+    print(
+        f"Tiempo inferencia : {prediction_time:.4f} segundos"
+    )
 
     # ==================================================
     # Guardar modelo
@@ -113,39 +124,60 @@ def train_random_forest(
     )
 
     # ==================================================
-    # Guardar predicciones
+    # Evaluación oficial NASA
+    # (solo última observación de cada motor)
     # ==================================================
 
-    prediction_df = pd.DataFrame(
-        {
-            "Real_RUL": y_test.values,
-            "Predicted_RUL": predictions,
-        }
+    prediction_df = test_info.copy()
+
+    prediction_df["Real_RUL"] = y_test.values
+
+    prediction_df["Predicted_RUL"] = predictions
+
+    prediction_df = (
+
+        prediction_df
+
+        .sort_values(
+            ["engine_id", "cycle"]
+        )
+
+        .groupby("engine_id")
+
+        .tail(1)
+
+        .reset_index(drop=True)
+
+    )
+
+    prediction_df["Signed_Error"] = (
+
+        prediction_df["Predicted_RUL"]
+
+        - prediction_df["Real_RUL"]
+
+    )
+
+    prediction_df["Absolute_Error"] = (
+
+        prediction_df["Signed_Error"].abs()
+
     )
 
     prediction_df.to_csv(
-        output_path / "predictions.csv",
-        index=False,
-    )
 
-    # ==================================================
-    # Guardar errores
-    # ==================================================
-
-    errors = prediction_df.copy()
-
-    errors["Error"] = (
-        errors["Predicted_RUL"]
-        - errors["Real_RUL"]
-    )
-
-    errors["Absolute_Error"] = (
-        errors["Error"].abs()
-    )
-
-    errors.to_csv(
         output_path / "prediction_errors.csv",
+
         index=False,
+
+    )
+
+    prediction_df.to_csv(
+
+        output_path / "predictions.csv",
+
+        index=False,
+
     )
 
     # ==================================================
@@ -153,11 +185,19 @@ def train_random_forest(
     # ==================================================
 
     evaluate_model(
+
         model_name="random_forest",
-        y_true=y_test,
-        y_pred=predictions,
+
+        y_true=prediction_df["Real_RUL"],
+
+        y_pred=prediction_df["Predicted_RUL"],
+
         train_time=train_time,
+
         prediction_time=prediction_time,
+
+        test_info=None,
+
     )
 
     # ==================================================
@@ -165,53 +205,95 @@ def train_random_forest(
     # ==================================================
 
     plot_predictions(
-        y_test,
-        predictions,
-        "random_forest",
-    )
 
-    # ==================================================
+        prediction_df["Real_RUL"],
+
+        prediction_df["Predicted_RUL"],
+
+        "random_forest",
+
+    )
+        # ==================================================
     # Importancia de variables
     # ==================================================
 
     plot_feature_importance(
+
         X_train.columns,
+
         model.feature_importances_,
+
         "random_forest",
+
     )
 
     importance = pd.DataFrame(
+
         {
+
             "Feature": X_train.columns,
+
             "Importance": model.feature_importances_,
+
         }
+
     )
 
     importance = importance.sort_values(
+
         by="Importance",
+
         ascending=False,
+
     )
 
     importance.to_excel(
+
         output_path / "feature_importance.xlsx",
+
         index=False,
+
     )
 
     importance.head(10).to_excel(
+
         output_path / "feature_importance_top10.xlsx",
+
         index=False,
+
     )
 
     # ==================================================
-    # Consola
+    # Resumen final
     # ==================================================
+
+    print("\n" + "=" * 60)
+    print("RANDOM FOREST FINALIZADO")
+    print("=" * 60)
+
+    print("\nModelo guardado en:")
+    print(output_path / "random_forest.pkl")
+
+    print("\nPredicciones guardadas en:")
+    print(output_path / "predictions.csv")
+
+    print("\nErrores guardados en:")
+    print(output_path / "prediction_errors.csv")
+
+    print("\nImportancia de variables:")
+    print(output_path / "feature_importance.xlsx")
+
+    print("\nTop 10 variables:")
+    print(output_path / "feature_importance_top10.xlsx")
+
+    print(f"\nTiempo entrenamiento : {train_time:.2f} segundos")
+
+    print(f"Tiempo inferencia    : {prediction_time:.4f} segundos")
 
     print("\nTop 10 variables más importantes:\n")
 
     print(importance.head(10))
 
     print("\nModelo Random Forest entrenado correctamente.")
-
-    print(f"\nResultados guardados en:\n{output_path}")
 
     return model

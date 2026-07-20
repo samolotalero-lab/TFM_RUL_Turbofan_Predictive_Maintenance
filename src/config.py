@@ -30,18 +30,29 @@ RF_MAX_DEPTH = None
 RF_N_JOBS = -1
 
 # ==========================================================
-# XGBoost
+# XGBoost (Optimizado para NASA FD001)
 # ==========================================================
 
+# Número de árboles
 XGB_N_ESTIMATORS = 500
 
-XGB_MAX_DEPTH = 6
+# Árboles ligeramente más pequeños para reducir sobreajuste
+XGB_MAX_DEPTH = 4
 
+# Learning rate más conservador
 XGB_LEARNING_RATE = 0.05
 
-XGB_SUBSAMPLE = 0.8
+# Utilizar el 90% de las muestras por árbol
+XGB_SUBSAMPLE = 0.90
 
-XGB_COLSAMPLE = 0.8
+# Utilizar el 90% de las variables por árbol
+XGB_COLSAMPLE = 0.90
+
+# Regularización L1
+XGB_REG_ALPHA = 0.10
+
+# Regularización L2
+XGB_REG_LAMBDA = 1.50
 
 # ==========================================================
 # LSTM

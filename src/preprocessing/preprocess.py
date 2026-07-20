@@ -22,21 +22,52 @@ def preprocess_data(
 ):
     """
     Realiza el preprocesamiento de los datos utilizando
-    el protocolo oficial de evaluación de NASA C-MAPSS.
+    el protocolo oficial de evaluación NASA C-MAPSS.
 
     El StandardScaler se ajusta únicamente con el conjunto
     de entrenamiento y posteriormente se aplica al conjunto
     de prueba.
+
+    Además, conserva la información de cada motor
+    (engine_id y cycle) para permitir la generación
+    correcta de secuencias en modelos recurrentes
+    como LSTM.
     """
 
+    # ==================================================
+    # Carpeta de modelos
+    # ==================================================
+
     models_path = Path("results/models")
+
     models_path.mkdir(
         parents=True,
         exist_ok=True,
     )
 
     # ==================================================
-    # Variables predictoras - TRAIN
+    # Información de TRAIN y TEST
+    # (se utilizará posteriormente para:
+    # - generación de secuencias LSTM
+    # - evaluación oficial por motor)
+    # ==================================================
+
+    train_info = train_df[
+        [
+            "engine_id",
+            "cycle",
+        ]
+    ].copy()
+
+    test_info = test_df[
+        [
+            "engine_id",
+            "cycle",
+        ]
+    ].copy()
+
+    # ==================================================
+    # Variables predictoras TRAIN
     # ==================================================
 
     X_train = train_df.drop(
@@ -47,10 +78,10 @@ def preprocess_data(
         ]
     )
 
-    y_train = train_df["RUL"]
+    y_train = train_df["RUL"].copy()
 
     # ==================================================
-    # Variables predictoras - TEST
+    # Variables predictoras TEST
     # ==================================================
 
     X_test = test_df.drop(
@@ -61,7 +92,7 @@ def preprocess_data(
         ]
     )
 
-    y_test = test_df["RUL"]
+    y_test = test_df["RUL"].copy()
 
     # ==================================================
     # Verificación de columnas
@@ -102,7 +133,7 @@ def preprocess_data(
     )
 
     # ==================================================
-    # Guardar StandardScaler
+    # Guardar scaler
     # ==================================================
 
     joblib.dump(
@@ -128,7 +159,14 @@ def preprocess_data(
     print("\ny_train                   :", y_train.shape)
     print("y_test                    :", y_test.shape)
 
+    print("\nX_train_scaled            :", X_train_scaled.shape)
+    print("X_test_scaled             :", X_test_scaled.shape)
+
     print("\nStandardScaler ajustado únicamente con TRAIN.")
+
+    print("\nInformación de TRAIN conservada para la generación de secuencias LSTM.")
+
+    print("Información de TEST conservada para la evaluación oficial NASA.")
 
     print("\nScaler guardado correctamente.")
 
@@ -143,5 +181,7 @@ def preprocess_data(
         y_test,
         X_train_scaled,
         X_test_scaled,
+        train_info,
+        test_info,
     )
-    
+
